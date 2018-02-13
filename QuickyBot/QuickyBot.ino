@@ -44,7 +44,7 @@
 #define RANGE_TRIG_PIN D2
 #define RANGE_ECHO_PIN D7
 #define RGB_LED_PIN D3 // 470om resistor
-
+#define CHARGING_DETECT_PIN D8
 
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
@@ -69,7 +69,9 @@ int distance;
 char auth[] = "6c9e360e833d49d79626f9909c673be3";
 
 BLYNK_READ(V5) {
-  Blynk.virtualWrite(V5, distance);
+  int voltage = analogRead(VBAT_PIN);
+  Blynk.virtualWrite(V5, voltage);
+//  Blynk.virtualWrite(V5, distance);
 }
 
 BLYNK_WRITE(V2)
@@ -133,17 +135,50 @@ long getDistanceCentim() {
   return pulseIn(RANGE_ECHO_PIN, HIGH) / 58.2;
 }
 
-void setup()
-{
-  // Debug console
-  Serial.begin(9600); 
+void motorsAttach() {
+  leftMotor.attach(LEFT_MOTOR_PIN);
+  rightMotor.attach(RIGHT_MOTOR_PIN);
+  leftMotor.write(90 + ledtMotorOffset);
+  rightMotor.write(90 + rightMotorOffset);  
   
-  strip.setBrightness(BRIGHTNESS);
-  strip.begin();
-  strip.setPixelColor(0, strip.Color(255,0,0, 255 ) );
-  strip.show(); // Initialize all pixels to 'off'
+}
+
+void motorsDetach() {
+  if(leftMotor.attached()) leftMotor.detach();
+  if(rightMotor.attached()) rightMotor.detach();
+}
+
+void chargingMode()
+{
+  Serial.println("Start Charging mode");
+  if(Blynk.connected()) Blynk.disconnect();
+  WiFi.disconnect();  
+  WiFi.mode(WIFI_OFF);
+
+  motorsDetach();
+  mySounds.play(soundLaugh);
+  
+  while(digitalRead(CHARGING_DETECT_PIN) == HIGH)
+  {
+      strip.setPixelColor(0, strip.Color(0,255,0, 50 ) );
+      strip.show();
+      delay(200);    
+      strip.setPixelColor(0, strip.Color(0, 0 ,0, 0 ) );
+      strip.show();    
+      delay(1000);    
+  }
+  while(1) {
+    mySounds.play(soundCuddly);
+    delay(10000);
+  }
+  Serial.println("End Charging mode");
+}
+
+
+void connect() {
   mySounds.play( soundConnection );
   WiFi.mode(WIFI_STA);
+  delay(500);
   int cnt = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -163,25 +198,41 @@ void setup()
     }
   }
   mySounds.play( soundSuperHappy );
-
   WiFi.printDiag(Serial);
-
   Blynk.config(auth);
 
+  motorsAttach();
+  strip.setPixelColor(0, strip.Color(0,150,0));
+  strip.show(); 
+
+}
+
+
+void setup()
+{
+  // Debug console
+  Serial.begin(9600);
+  delay(1000);
+  pinMode(CHARGING_DETECT_PIN, INPUT); 
   pinMode(RANGE_TRIG_PIN, OUTPUT);
   pinMode(RANGE_ECHO_PIN, INPUT);
 
-  leftMotor.attach(LEFT_MOTOR_PIN);
-  rightMotor.attach(RIGHT_MOTOR_PIN);
-  leftMotor.write(90 + ledtMotorOffset);
-//  rightMotor.write(90 + rightMotorOffset);
-
-  strip.setPixelColor(0, strip.Color(0,150,0));
-  strip.show(); 
+  strip.setBrightness(BRIGHTNESS);
+  strip.begin();
+  strip.setPixelColor(0, strip.Color(255,0,0, 255 ) );
+  strip.show();
+  if(digitalRead(CHARGING_DETECT_PIN) == HIGH)   {
+    chargingMode();
+  } 
+  connect();
 }
 
 void loop()
 {
+  if(digitalRead(CHARGING_DETECT_PIN) == HIGH)   {
+    chargingMode();
+    connect();
+  } 
   Blynk.run();
   distance = getDistanceCentim();
 }
