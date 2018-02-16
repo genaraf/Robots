@@ -46,12 +46,20 @@
 #define RGB_LED_PIN D3 // 470om resistor
 #define CHARGING_DETECT_PIN D8
 
+#define LOW_BATTARY 644 ~3.3V
+
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
 #include <Servo.h>
 #include <PiezoEffects.h>
 #include <Adafruit_NeoPixel.h>
 
+enum {
+  MANUAL_MODE,
+  AUTOMATIC1_MODE,
+  AUTOMATIC2_MODE,
+  GUARD_MODE  
+} robotMode;
 
 Servo leftMotor;
 Servo rightMotor;
@@ -63,26 +71,45 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, RGB_LED_PIN, NEO_GRBW + NEO_KHZ80
 int ledtMotorOffset = 12;
 int rightMotorOffset = 0;
 int distance;
+int voltage;
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 char auth[] = "6c9e360e833d49d79626f9909c673be3";
 
 BLYNK_READ(V5) {
-  int voltage = analogRead(VBAT_PIN);
+  // 820 - ~4.2V
   Blynk.virtualWrite(V5, voltage);
-//  Blynk.virtualWrite(V5, distance);
 }
 
 BLYNK_WRITE(V2)
 {
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
-  // You can also use:
-  // String i = param.asStr();
-  // double d = param.asDouble();
-  Serial.print("V2 Button is: ");
-  Serial.println(pinValue);
-}
+  int pinValue = param.asInt(); 
+  switch(pinValue) {
+    case 1:
+      Serial.print("Mode: manual");
+      robotMode = MANUAL_MODE;
+      break;
+    
+    case 2:
+      Serial.print("Mode: automatic 1");
+      randomSeed();
+      robotMode = AUTOMATIC1_MODE;
+      break;
+    
+    case 3:
+      Serial.print("Mode: automatic 2");
+      robotMode = AUTOMATIC2_MODE;
+      break;
+
+    case 4:
+      Serial.print("Mode: guard");
+      robotMode = GUARD_MODE;  
+      break;
+   
+  }
+ }
+
 
 BLYNK_WRITE(V6)
 {
@@ -98,15 +125,6 @@ BLYNK_WRITE(V6)
   Serial.println(ledtMotorOffset);
 }
 
-BLYNK_WRITE(V7)
-{
-  int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
-  // You can also use:
-  // String i = param.asStr();
-  // double d = param.asDouble();
-  Serial.print("V7 Slider value is: ");
-  Serial.println(pinValue);
-}
 
 BLYNK_WRITE(V1) {
   int x = param[0].asInt();
@@ -132,7 +150,7 @@ long getDistanceCentim() {
   delayMicroseconds(10); 
   digitalWrite(RANGE_TRIG_PIN, LOW);
     
-  return pulseIn(RANGE_ECHO_PIN, HIGH) / 58.2;
+  return pulseIn(RANGE_ECHO_PIN, HIGH, 5000) / 58.2;
 }
 
 void motorsAttach() {
@@ -152,7 +170,6 @@ void chargingMode()
 {
   Serial.println("Start Charging mode");
   if(Blynk.connected()) Blynk.disconnect();
-  WiFi.disconnect();  
   WiFi.mode(WIFI_OFF);
 
   motorsDetach();
@@ -174,6 +191,21 @@ void chargingMode()
   Serial.println("End Charging mode");
 }
 
+void LowBattaryMode()
+{
+  Serial.println("Start Charging mode");
+  if(Blynk.connected()) Blynk.disconnect();
+  WiFi.mode(WIFI_OFF);
+  motorsDetach();
+  while(1) {
+    mySounds.play( soundBeeps );
+    delay(200); 
+    mySounds.play( soundBeeps );
+    delay(200); 
+    mySounds.play( soundBeeps );
+    delay(10000); 
+  }
+}
 
 void connect() {
   mySounds.play( soundConnection );
@@ -211,6 +243,7 @@ void connect() {
 void setup()
 {
   // Debug console
+  robotMode = MANUAL_MODE;
   Serial.begin(9600);
   delay(1000);
   pinMode(CHARGING_DETECT_PIN, INPUT); 
@@ -224,6 +257,9 @@ void setup()
   if(digitalRead(CHARGING_DETECT_PIN) == HIGH)   {
     chargingMode();
   } 
+  if((voltage = analogRead(VBAT_PIN)) < LOW_BATTARY)   {
+    chargingMode();
+  } 
   connect();
 }
 
@@ -233,6 +269,10 @@ void loop()
     chargingMode();
     connect();
   } 
+  if((voltage = analogRead(VBAT_PIN)) < LOW_BATTARY)   {
+    chargingMode();
+  } 
+
   Blynk.run();
   distance = getDistanceCentim();
 }
