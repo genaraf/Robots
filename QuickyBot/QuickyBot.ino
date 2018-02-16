@@ -46,7 +46,10 @@
 #define RGB_LED_PIN D3 // 470om resistor
 #define CHARGING_DETECT_PIN D8
 
-#define LOW_BATTARY 644 ~3.3V
+#define LOW_BATTERY 644 // ~3.3V
+#define MOTORS_STOP_INACTIVITY_TIMEOUT 10000 // 10sec
+#define INACTIVITY_SOUND_TIMEOUT 100000      // 100sec
+#define AUTOMATIC_PAUSE 2000
 
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
@@ -72,10 +75,27 @@ int ledtMotorOffset = 12;
 int rightMotorOffset = 0;
 int distance;
 int voltage;
+bool motorsOn = false;
+unsigned long lastActivity;
 
 // You should get Auth Token in the Blynk App.
 // Go to the Project Settings (nut icon).
 char auth[] = "6c9e360e833d49d79626f9909c673be3";
+
+void motorsAttach() {
+  if(!leftMotor.attached()) leftMotor.attach(LEFT_MOTOR_PIN);
+  if(!rightMotor.attached()) rightMotor.attach(RIGHT_MOTOR_PIN);
+  leftMotor.write(90 + ledtMotorOffset);
+  rightMotor.write(90 + rightMotorOffset);
+  motorsOn = true;  
+  
+}
+
+void motorsDetach() {
+  if(leftMotor.attached()) leftMotor.detach();
+  if(rightMotor.attached()) rightMotor.detach();
+  motorsOn = false;
+}
 
 BLYNK_READ(V5) {
   // 820 - ~4.2V
@@ -88,23 +108,37 @@ BLYNK_WRITE(V2)
   switch(pinValue) {
     case 1:
       Serial.print("Mode: manual");
+      strip.setPixelColor(0, strip.Color(0,150,0));
+      strip.show();  
+      lastActivity = millis();
       robotMode = MANUAL_MODE;
       break;
     
     case 2:
       Serial.print("Mode: automatic 1");
-      randomSeed();
+      randomSeed(millis());
+      strip.setPixelColor(0, strip.Color(0,120,120, 50 ) );  
+      strip.show();  
+      lastActivity = millis() - AUTOMATIC_PAUSE;
       robotMode = AUTOMATIC1_MODE;
+      motorsAttach();
       break;
     
     case 3:
       Serial.print("Mode: automatic 2");
+      randomSeed(millis());
+      strip.setPixelColor(0, strip.Color(0,0,250, 50 ) );  
+      strip.show();  
+      lastActivity = millis() - AUTOMATIC_PAUSE;
       robotMode = AUTOMATIC2_MODE;
+      motorsAttach();
       break;
 
     case 4:
       Serial.print("Mode: guard");
-      robotMode = GUARD_MODE;  
+      robotMode = GUARD_MODE;
+      motorsDetach();
+      strip.clear();  
       break;
    
   }
@@ -126,6 +160,7 @@ BLYNK_WRITE(V6)
 }
 
 
+// Joystick
 BLYNK_WRITE(V1) {
   int x = param[0].asInt();
   int y = param[1].asInt();
@@ -135,11 +170,15 @@ BLYNK_WRITE(V1) {
   Serial.print(x);
   Serial.print("; Y = ");
   Serial.println(y);
-  x = (x -90)/3;
-  
-  leftMotor.write( (180 - y) + x + ledtMotorOffset);
-  rightMotor.write(y + x + rightMotorOffset);  
-  
+  if(robotMode != GUARD_MODE) { 
+    x = (x -90)/3;
+    if(!motorsOn) {
+      motorsAttach();  
+    }
+    leftMotor.write( (180 - y) + x + ledtMotorOffset);
+    rightMotor.write(y + x + rightMotorOffset);  
+    lastActivity = millis();
+  }
 }
 
 long getDistanceCentim() {
@@ -151,19 +190,6 @@ long getDistanceCentim() {
   digitalWrite(RANGE_TRIG_PIN, LOW);
     
   return pulseIn(RANGE_ECHO_PIN, HIGH, 5000) / 58.2;
-}
-
-void motorsAttach() {
-  leftMotor.attach(LEFT_MOTOR_PIN);
-  rightMotor.attach(RIGHT_MOTOR_PIN);
-  leftMotor.write(90 + ledtMotorOffset);
-  rightMotor.write(90 + rightMotorOffset);  
-  
-}
-
-void motorsDetach() {
-  if(leftMotor.attached()) leftMotor.detach();
-  if(rightMotor.attached()) rightMotor.detach();
 }
 
 void chargingMode()
@@ -191,11 +217,13 @@ void chargingMode()
   Serial.println("End Charging mode");
 }
 
-void LowBattaryMode()
+void LowBatteryMode()
 {
   Serial.println("Start Charging mode");
   if(Blynk.connected()) Blynk.disconnect();
   WiFi.mode(WIFI_OFF);
+  strip.clear();
+  strip.show(); // ?? 
   motorsDetach();
   while(1) {
     mySounds.play( soundBeeps );
@@ -205,6 +233,32 @@ void LowBattaryMode()
     mySounds.play( soundBeeps );
     delay(10000); 
   }
+}
+
+void ManualMode() {
+  unsigned long timeOut = millis() - lastActivity; 
+  if(timeOut > MOTORS_STOP_INACTIVITY_TIMEOUT) {
+      if(motorsOn) {
+        motorsDetach();
+      } else {
+        if(timeOut % INACTIVITY_SOUND_TIMEOUT)
+          mySounds.play(soundSleeping);  
+      }      
+  }
+}
+
+void Automatic1Mode() {
+  unsigned long timeOut = millis() - lastActivity;
+  if(timeOut < AUTOMATIC_PAUSE)
+    return;   
+}
+  
+void Automatic2Mode() {
+    
+}
+
+void GuardMode() {
+  distance = getDistanceCentim();    
 }
 
 void connect() {
@@ -232,8 +286,8 @@ void connect() {
   mySounds.play( soundSuperHappy );
   WiFi.printDiag(Serial);
   Blynk.config(auth);
-
-  motorsAttach();
+  lastActivity = millis();
+//  motorsAttach();
   strip.setPixelColor(0, strip.Color(0,150,0));
   strip.show(); 
 
@@ -257,8 +311,8 @@ void setup()
   if(digitalRead(CHARGING_DETECT_PIN) == HIGH)   {
     chargingMode();
   } 
-  if((voltage = analogRead(VBAT_PIN)) < LOW_BATTARY)   {
-    chargingMode();
+  if((voltage = analogRead(VBAT_PIN)) < LOW_BATTERY)   {
+    LowBatteryMode();
   } 
   connect();
 }
@@ -269,11 +323,28 @@ void loop()
     chargingMode();
     connect();
   } 
-  if((voltage = analogRead(VBAT_PIN)) < LOW_BATTARY)   {
-    chargingMode();
+  if((voltage = analogRead(VBAT_PIN)) < LOW_BATTERY)   {
+    LowBatteryMode();
   } 
 
+  switch(robotMode) {
+    case MANUAL_MODE:
+      
+      break;
+    
+    case AUTOMATIC1_MODE:
+      Automatic1Mode();
+      break;
+    
+    case AUTOMATIC2_MODE:
+      Automatic2Mode();
+      break;
+
+    case GUARD_MODE:
+      GuardMode();
+      break;
+   
+  }
   Blynk.run();
-  distance = getDistanceCentim();
 }
 
