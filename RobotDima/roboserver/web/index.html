@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="bootstrap.min.css">
+
+    <!-- jQuery library -->
+    <script src="jquery.min.js"></script>
+
+    <!-- Latest compiled JavaScript -->
+    <script src="bootstrap.min.js"></script>
+
+	<script>
+        var client = new XMLHttpRequest();
+
+        setInterval("update_report();",1000); 
+        
+        function update_report(){
+            client.open('GET', '/report');
+            client.onload = function() {
+                document.getElementById('report').value += client.responseText;
+            }
+            client.send();
+         }
+        
+        function RunProgram() {
+            client.open('POST', "/run/program/" + document.getElementById('progr_name').value);
+            client.onload = function() {
+                document.getElementById('report').value = client.responseText;
+            }
+            client.send(document.getElementById('codeEditor').value);
+        }
+
+        function SaveProgram() {
+            client.open('POST', "/save/program/" + document.getElementById('progr_name').value);
+            client.onload = function() {
+                document.getElementById('report').value = client.responseText;
+            }
+            client.send(document.getElementById('codeEditor').value);
+        }
+
+
+        function StopProgram() {
+            client.open('GET', '/stop/program');
+            client.onload = function() {
+                document.getElementById('report').value += client.responseText;
+            }
+            client.send();
+        }
+
+        function LoadProgram() {
+     
+            client.open('GET', '/view/program/' + document.getElementById('progr_name').value);
+            client.setRequestHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            client.onload = function() {
+                document.getElementById('codeEditor').value = client.responseText;
+            }
+            client.send();
+        }
+
+        function CleanReport() {
+            document.getElementById('report').value = " ";
+        }
+
+     </script>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        overflow:hidden;
+        background-color: #efefef;
+    }
+    textarea {
+        resize: none;
+    }
+    
+    #Header, #Left , #Right, #Footer {
+        position: absolute;
+    }
+    #Header{
+        top: 10px;
+        width: 100%;
+        height: 60px;
+
+    }
+    #Left {
+        top: 50px;
+        width: calc(70% - 20px);
+        left: 10px;
+        bottom: 200px;
+        z-index:100;
+    }
+    #Right {
+        top: 50px;
+        left: 70%;
+        right: 10px;
+        bottom: 200px;
+    }
+    #Footer {
+        bottom: 20px;
+        left : 10px;
+        width: calc(100% - 20px);
+        height: 180px;
+    }
+    .textProgram{
+        text-align: center;
+    }
+    .textField{
+        width: 100%;
+        height: 100%;
+    }
+    .report{
+        width: 100%;
+        height: calc(100% - 30px);
+    }
+</style>
+<body onload="LoadProgram()" >
+    <div id="container">
+        <div id="Header">
+            <div class="row">
+                <div class="col-sm-1 textProgram">
+                    <h4> Programm: </h4>
+                </div>
+                <div class="col-sm-2 select">
+                    <select onchange="LoadProgram()" id="progr_name" class="form-control" style="width:100%" >
+                        <option value="1">Program-1</option>
+                        <option value="2">Program-2</option>
+                        <option value="3">Program-3</option>
+                        <option value="4">Program-4</option>
+                        <option value="5">Program-5</option>
+                        <option value="6">Program-6</option>
+                        <option value="7">Program-7</option>
+                        <option value="8">Program-8</option>
+                        <option value="9">Program-9</option>
+                    </select>
+                </div>
+                <div class="col-sm-1" style="">
+                    <button class="btn btn-primary runButton" onclick="SaveProgram()" >Save </button>
+                </div>
+                <div class="col-sm-1" style="">
+                    <button class="btn btn-primary runButton" onclick="RunProgram()" >RUN </button>
+                </div>
+                <div class="col-sm-1" style="">
+                    <button class="btn btn-primary runButton" onclick="StopProgram()" >Stop </button>
+                </div>
+            </div>
+        </div>
+        <div id="Left">
+            <textarea id="codeEditor" class="textField">Source code</textarea>
+        </div>
+        <div id="Right">
+            <iframe src="manual.html" class="textField" scrolling="yes"></iframe> 
+        </div>
+        <div id="Footer">
+            <div class="col-sm-1">
+                <h4> Result: </h4>
+            </div>
+            <div class="col-sm-1" style="">
+                <button class="btn btn-primary runButton" onclick="CleanReport()" >Clean</button>
+            </div>
+            <textarea id="report" class="report"></textarea>
+      </div>
+    </div>
+</body>
+</html>

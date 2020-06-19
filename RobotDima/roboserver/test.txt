@@ -1,0 +1,3 @@
+curl -vvv --request POST --url localhost:8080/save/program/1 --header 'content-type: application/json' --data 'test programm'
+curl -vvv http://127.0.0.1:8080/view/program/1
+

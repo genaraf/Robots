@@ -1,0 +1,79 @@
+sound(x)
+---------------------
+connection 	     0
+disconnection    1
+buttonPushed 	 2
+mode1 		     3
+mode2 		     4
+mode3 		     5
+surprise 		 6
+OhOoh 		     7
+OhOoh2 		     8
+cuddly 		     9
+sleeping 		10
+happy 		    11
+superHappy 	    12
+happy_short 	13
+sad 			14
+confused 		15
+fart1			16
+fart2			17
+fart3			18
+
+mouth(x)
+---------------------
+zero 				0
+one  				1                
+two     			2               
+three               3  
+four                4
+five                5 
+six                 6 
+seven               7  
+eight               8 
+nine   				9
+smile               10                  
+happyOpen      		11  
+happyClosed 	    12  
+heart      			13
+bigSurprise         14  
+smallSurprise 		15
+tongueOut 			16
+vamp1               17  
+vamp2               18  
+lineMouth        	19
+confused            20  
+diagonal       		21          
+sad         		22
+sadOpen 	        23 
+sadClosed 		  	24
+okMouth             25 
+xMouth              26
+interrogation       27
+thunder		       	28
+culito       		29
+angry 				30
+
+RC(cmd, duration)
+-----------------------
+home              0
+walk forward      1
+walk backward     2
+turn left         3
+turn right        4
+updown            5
+moonwalker FW     6
+moonwalker BW     7 
+swing             8
+crusaito FW       9
+crusaito BW       10
+jump              11
+flapping FW       12
+flapping BW       13
+tiptoeSwing       14
+bend     FW       15
+bend     BW       16
+shakeLeg FW       17
+shakeLeg BW       18
+jitter            19
+ascendingTurn     20
